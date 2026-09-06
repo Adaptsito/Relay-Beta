@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>OBS Web Streamer</title>
+<style>
+  :root {
+    --obs-bg: #1e1e1e;
+    --obs-panel: #2b2b2b;
+    --obs-border: #3f3f3f;
+    --obs-highlight: #3e3e42;
+    --obs-text: #cccccc;
+    --obs-white: #ffffff;
+    --obs-accent: #0078d7;
+    --live: #ff4a4a;
+    --standby: #d39c00;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--obs-bg);
+    color: var(--obs-text);
+    font-family: "Segoe UI", -apple-system, sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header (Menu Bar) */
+  header {
+    background: var(--obs-panel);
+    border-bottom: 1px solid var(--obs-border);
+    padding: 6px 12px;
+    font-size: 13px;
+    display: flex;
+    gap: 16px;
+  }
+  header span { cursor: pointer; }
+
+  /* Main Workspace */
+  .workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    gap: 10px;
+    overflow: hidden;
+  }
+
+  /* Preview Area */
+  .preview-area {
+    flex: 1;
+    background: #000;
+    border: 1px solid var(--obs-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  
+  /* The Canvas Compositor */
+  canvas#compositor {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background: #111;
+  }
+  
+  .empty-text {
+    position: absolute;
+    color: #666;
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  /* Docks Area */
+  .docks {
+    display: flex;
+    height: 250px;
+    gap: 10px;
+  }
+
+  .dock {
+    flex: 1;
+    background: var(--obs-panel);
+    border: 1px solid var(--obs-border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dock-header {
+    background: var(--obs-bg);
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    border-bottom: 1px solid var(--obs-border);
+  }
+
+  .dock-content {
+    padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Controls & Inputs */
+  label { display: block; margin-bottom: 4px; color: var(--obs-text); }
+  
+  input[type="password"], input[type="file"] {
+    width: 100%;
+    padding: 6px;
+    background: var(--obs-bg);
+    border: 1px solid var(--obs-border);
+    color: var(--obs-white);
+    font-family: monospace;
+  }
+
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    background: var(--obs-highlight);
+    border: 1px solid var(--obs-border);
+    cursor: pointer;
+  }
+
+  button {
+    width: 100%;
+    padding: 8px;
+    background: var(--obs-highlight);
+    border: 1px solid var(--obs-border);
+    color: var(--obs-white);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover:not(:disabled) { background: #4a4a4f; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.streaming { background: #471414; border-color: var(--live); color: #ff9999; }
+
+  /* Status Bar */
+  .status-bar {
+    background: var(--obs-accent);
+    color: #fff;
+    padding: 4px 12px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .status-bar.idle { background: var(--obs-accent); }
+  .status-bar.live { background: var(--live); }
+  .status-bar.error { background: #8a2be2; }
+</style>
+</head>
+<body>
+
+  <header>
+    <span>File</span>
+    <span>Edit</span>
+    <span>View</span>
+    <span>Profile</span>
+    <span>Help</span>
+  </header>
+
+  <div class="workspace">
+    <div class="preview-area">
+      <span class="empty-text" id="emptyText">No Display Capture Source</span>
+      <canvas id="compositor"></canvas>
+      <!-- Hidden video element to receive the raw display stream -->
+      <video id="rawVideo" autoplay muted playsinline hidden></video>
+    </div>
+
+    <div class="docks">
+      <div class="dock">
+        <div class="dock-header">Sources</div>
+        <div class="dock-content">
+          <button id="addDisplayBtn">➕ Add Display Capture</button>
+          
+          <div>
+            <label>➕ Add Image Overlay (PNG/JPG)</label>
+            <input type="file" id="overlayInput" accept="image/png, image/jpeg">
+          </div>
+          <button id="clearOverlayBtn">🗑️ Clear Overlay</button>
+          
+          <div style="margin-top: auto;">
+            <label><input type="checkbox" id="micToggle"> Include Microphone</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock">
+        <div class="dock-header">Controls</div>
+        <div class="dock-content">
+          <label>Twitch Stream Key</label>
+          <input type="password" id="streamKey" placeholder="live_xxxxxxxxxxxxxxxxxxxx">
+          
+          <button id="goLiveBtn" disabled>Start Streaming</button>
+          <button id="stopBtn" disabled>Stop Streaming</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar idle" id="statusBar">
+    <span id="statusText">Ready</span>
+    <span id="timer">LIVE: 00:00:00</span>
+  </div>
+
+<script>
+const WHIP_ENDPOINT = 'https://g.webrtc.live-video.net:4443/v2/offer';
+
+const els = {
+  addDisplayBtn: document.getElementById('addDisplayBtn'),
+  overlayInput: document.getElementById('overlayInput'),
+  clearOverlayBtn: document.getElementById('clearOverlayBtn'),
+  micToggle: document.getElementById('micToggle'),
+  streamKey: document.getElementById('streamKey'),
+  goLiveBtn: document.getElementById('goLiveBtn'),
+  stopBtn: document.getElementById('stopBtn'),
+  compositor: document.getElementById('compositor'),
+  rawVideo: document.getElementById('rawVideo'),
+  emptyText: document.getElementById('emptyText'),
+  statusBar: document.getElementById('statusBar'),
+  statusText: document.getElementById('statusText'),
+  timer: document.getElementById('timer')
+};
+
+const ctx = els.compositor.getContext('2d');
+let pc = null;
+let whipResourceUrl = null;
+let displayStream = null;
+let micStream = null;
+let canvasStream = null;
+let overlayImage = null;
+let animationFrameId = null;
+let startTime = null;
+let timerInterval = null;
+
+function setStatus(state, text) {
+  els.statusBar.className = `status-bar ${state}`;
+  els.statusText.textContent = text;
+}
+
+function updateTimer() {
+  const s = Math.floor((Date.now() - startTime) / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  els.timer.textContent = `LIVE: ${hh}:${mm}:${ss}`;
+}
+
+// Retained audio mixing logic from original script
+function mixAudioTracks(tracks) {
+  const real = tracks.filter(Boolean);
+  if (real.length === 0) return null;
+  if (real.length === 1) return real[0];
+  const audioCtx = new AudioContext();
+  const dest = audioCtx.createMediaStreamDestination();
+  real.forEach((track) => {
+    audioCtx.createMediaStreamSource(new MediaStream([track])).connect(dest);
+  });
+  return dest.stream.getAudioTracks()[0];
+}
+
+function preferH264(peerConnection) {
+  try {
+    const transceiver = peerConnection.getTransceivers()
+      .find((t) => t.sender.track && t.sender.track.kind === 'video');
+    if (!transceiver || !transceiver.setCodecPreferences) return;
+    const codecs = RTCRtpSender.getCapabilities('video').codecs;
+    const h264 = codecs.filter((c) => c.mimeType === 'video/H264');
+    if (h264.length) transceiver.setCodecPreferences(h264);
+  } catch (err) {
+    console.warn('Could not set H264 preference:', err);
+  }
+}
+
+function waitForIceGathering(peerConnection) {
+  if (peerConnection.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise((resolve) => {
+    function check() {
+      if (peerConnection.iceGatheringState === 'complete') {
+        peerConnection.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      }
+    }
+    peerConnection.addEventListener('icegatheringstatechange', check);
+    setTimeout(resolve, 4000); 
+  });
+}
+
+// ----------------------------------------------------
+// Canvas Compositor Engine
+// ----------------------------------------------------
+function startCompositor() {
+  // Sync canvas resolution to the captured video
+  els.compositor.width = els.rawVideo.videoWidth || 1920;
+  els.compositor.height = els.rawVideo.videoHeight || 1080;
+
+  function drawFrame() {
+    // 1. Draw Screen Capture
+    if (displayStream && els.rawVideo.readyState >= 2) {
+      ctx.drawImage(els.rawVideo, 0, 0, els.compositor.width, els.compositor.height);
+    } else {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, els.compositor.width, els.compositor.height);
+    }
+
+    // 2. Draw Overlay Image (if loaded)
+    if (overlayImage) {
+      // Example: Draw overlay scaled to fit width, maintaining aspect ratio
+      const aspectRatio = overlayImage.height / overlayImage.width;
+      const drawHeight = els.compositor.width * aspectRatio;
+      ctx.drawImage(overlayImage, 0, 0, els.compositor.width, drawHeight);
+    }
+
+    animationFrameId = requestAnimationFrame(drawFrame);
+  }
+  
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  drawFrame();
+}
+
+// Handle Local Image Upload for Overlay
+els.overlayInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => { overlayImage = img; };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+els.clearOverlayBtn.addEventListener('click', () => {
+  overlayImage = null;
+  els.overlayInput.value = '';
+});
+
+// ----------------------------------------------------
+// Stream Controls
+// ----------------------------------------------------
+async function shareScreen() {
+  try {
+    displayStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 30 },
+      audio: true,
+    });
+    
+    els.rawVideo.srcObject = displayStream;
+    els.emptyText.style.display = 'none';
+    
+    // Wait for video metadata to initialize the compositor dimensions
+    els.rawVideo.addEventListener('loadedmetadata', startCompositor);
+    
+    els.addDisplayBtn.disabled = true;
+    els.goLiveBtn.disabled = false;
+    
+    displayStream.getVideoTracks()[0].addEventListener('ended', stopEverything);
+  } catch (err) {
+    setStatus('error', 'Screen share cancelled');
+  }
+}
+
+async function goLive() {
+  const key = els.streamKey.value.trim();
+  if (!key) {
+    setStatus('error', 'Stream key required');
+    return;
+  }
+
+  els.goLiveBtn.disabled = true;
+  els.goLiveBtn.classList.add('streaming');
+  els.goLiveBtn.textContent = 'Streaming...';
+  els.stopBtn.disabled = false;
+  setStatus('standby', 'Connecting to Twitch...');
+
+  try {
+    if (els.micToggle.checked) {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    
+    const mixedAudio = mixAudioTracks([
+      ...(micStream ? micStream.getAudioTracks() : []),
+      ...displayStream.getAudioTracks(),
+    ]);
+
+    // CAPTURE THE CANVAS INSTEAD OF THE RAW VIDEO
+    canvasStream = els.compositor.captureStream(30);
+
+    pc = new RTCPeerConnection();
+    
+    // Add the composited canvas video track
+    pc.addTrack(canvasStream.getVideoTracks()[0], canvasStream);
+    
+    // Add the mixed audio track
+    if (mixedAudio) pc.addTrack(mixedAudio, canvasStream);
+    
+    preferH264(pc);
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitForIceGathering(pc);
+
+    const res = await fetch(WHIP_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sdp',
+        'Authorization': `Bearer ${key}`,
+      },
+      body: pc.localDescription.sdp,
+    });
+
+    if (!res.ok) throw new Error(`Twitch rejected connection (HTTP ${res.status})`);
+
+    whipResourceUrl = res.headers.get('Location');
+    const answerSdp = await res.text();
+    await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+    startTime = Date.now();
+    timerInterval = setInterval(updateTimer, 1000);
+    setStatus('live', 'LIVE');
+  } catch (err) {
+    console.error(err);
+    setStatus('error', err.message || 'Could not connect');
+    els.goLiveBtn.disabled = false;
+    els.goLiveBtn.classList.remove('streaming');
+    els.goLiveBtn.textContent = 'Start Streaming';
+  }
+}
+
+async function stopEverything() {
+  clearInterval(timerInterval);
+  if (animationFrameId) cancelAnimationFrame(animationFrameId);
+  
+  if (whipResourceUrl) {
+    try { await fetch(whipResourceUrl, { method: 'DELETE' }); } catch (err) {}
+  }
+  if (pc) { pc.close(); pc = null; }
+  
+  [displayStream, micStream, canvasStream].forEach((s) => s && s.getTracks().forEach((t) => t.stop()));
+  displayStream = null;
+  micStream = null;
+  canvasStream = null;
+  whipResourceUrl = null;
+
+  els.rawVideo.srcObject = null;
+  els.emptyText.style.display = 'block';
+  els.addDisplayBtn.disabled = false;
+  els.goLiveBtn.disabled = true;
+  els.goLiveBtn.classList.remove('streaming');
+  els.goLiveBtn.textContent = 'Start Streaming';
+  els.stopBtn.disabled = true;
+  els.timer.textContent = 'LIVE: 00:00:00';
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, els.compositor.width, els.compositor.height);
+  
+  setStatus('idle', 'Ready');
+}
+
+els.addDisplayBtn.addEventListener('click', shareScreen);
+els.goLiveBtn.addEventListener('click', goLive);
+els.stopBtn.addEventListener('click', stopEverything);
+</script>
+</body>
+</html>
