@@ -17,3 +17,5 @@ Keep the Relay tab open while streaming. Closing the tab will end your stream
 For the most reliable audio sharing select a Chrome tab and enable Share tab audio
 
 Your stream key is only kept in the page’s memory for that session and isn’t stored on a server
+
+This is the beta and the beta is to test new features and ideas for future main releases go to my profile and the latest main release is their.
