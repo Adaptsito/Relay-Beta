@@ -3,6 +3,7 @@ Relay
 Stream your Chromebook screen directly to Twitch from your browser
 
 Using it
+	
 	1.	In the Controls panel, click Capture Screen and pick the screen,
 window, or tab to broadcast. It shows up in the preview immediately.
 	2.	(Optional) Add overlays: click the + above Sources, choose Text or
