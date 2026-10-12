@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Relay</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="menubar">
+  <div class="brand"><span class="brand-dot" id="bDot"></span>Relay</div>
+
+  <span class="mitem">File</span>
+  <div class="menu-dd">
+    <div class="menu-opt" id="menuExport">Export project…</div>
+    <div class="menu-opt" id="menuImport">Import project…</div>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </div>
+
+  <span class="mitem">Edit</span>
+  <div class="menu-dd">
+    <div class="menu-opt" id="menuUndo">Undo <span class="menu-kbd">Ctrl+Z</span></div>
+    <div class="menu-opt" id="menuRedo">Redo <span class="menu-kbd">Ctrl+Y</span></div>
+  </div>
+
+  <span class="mitem">View</span>
+  <div class="menu-dd">
+    <div class="menu-opt" id="menuHighContrast">Toggle high-contrast mode</div>
+  </div>
+
+  <span class="mitem">Help</span>
+  <div class="menu-dd">
+    <div class="menu-opt" id="menuHelp">Show walkthrough</div>
+    <div class="menu-opt" id="menuAbout">About Relay</div>
+  </div>
+
+  <span class="menu-spacer"></span>
+  <span class="ver-label" id="verLabel">Relay</span>
+</div>
+
+<div id="restoreBar" class="restore-bar">
+  <span>Restore your last session (scenes &amp; overlay layout)?</span>
+  <button class="mbtn mbtn-ok" id="restoreYes">Restore</button>
+  <button class="mbtn" id="restoreNo">Dismiss</button>
+</div>
+
+<div id="main">
+  <div id="preview-area">
+    <div id="canvas-wrap">
+      <canvas id="preview" width="1280" height="720"></canvas>
+      <span id="pbadge">No source</span>
+      <span id="livebadge">● LIVE</span>
+      <div id="captionOverlay"><span id="captionOverlayText"></span></div>
+    </div>
+  </div>
+
+  <div id="dock">
+
+    <div class="dp" id="pScenes">
+      <div class="dp-hd" data-collapsible>
+        <span class="collapse-btn">▾</span>Scenes<span class="addbtn" id="addSceneBtn" title="Add scene">＋</span>
+      </div>
+      <div class="dp-body" id="scenesBody"></div>
+    </div>
+
+    <div class="dp" id="pSources">
+      <div class="dp-hd" data-collapsible>
+        <span class="collapse-btn">▾</span>Sources<span class="addbtn" id="addSrcBtn" title="Add source">＋</span>
+      </div>
+      <div class="dp-body" id="sourcesBody"></div>
+    </div>
+
+    <div class="dp" id="pSfx">
+      <div class="dp-hd" data-collapsible>
+        <span class="collapse-btn">▾</span>Soundboard<span class="addbtn" id="sfxAddBtn" title="Upload MP3s">＋</span>
+      </div>
+      <div class="dp-body">
+        <div id="sfxBody"></div>
+        <div class="sfx-foot">
+          <button class="btn" id="sfxStopBtn">■ Stop all sounds</button>
+          <div class="frow" style="margin-top:6px">
+            <label>Master volume</label>
+            <input type="range" id="sfxVolume" min="0" max="100" value="80">
+          </div>
+        </div>
+      </div>
+      <input type="file" id="sfxFile" accept="audio/*" multiple hidden>
+    </div>
+
+    <div class="dp" id="pAudio">
+      <div class="dp-hd" data-collapsible><span class="collapse-btn">▾</span>Audio Mixer</div>
+      <div class="dp-body">
+        <div class="atrack">
+          <div class="atrack-hd">
+            <span class="atrack-label">Desktop</span>
+            <button class="mute-btn" id="deskMuteBtn">🔊</button>
+          </div>
+          <div class="meter-bar"><div class="meter-fill" id="deskMeter"></div></div>
+        </div>
+        <div class="atrack">
+          <div class="mic-row">
+            <label for="micToggle">Mic</label>
+            <input type="checkbox" id="micToggle">
+          </div>
+          <div class="meter-bar"><div class="meter-fill" id="micMeter"></div></div>
+          <div class="mic-sub">
+            <label class="chk-inline"><input type="checkbox" id="gateToggle">Noise gate</label>
+            <input type="range" id="gateThresh" min="0" max="300" value="60" disabled>
+          </div>
+          <div class="mic-sub">
+            <label class="chk-inline"><input type="checkbox" id="duckToggle">Duck desktop audio when talking</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dp" id="pControls">
+      <div class="dp-hd" data-collapsible><span class="collapse-btn">▾</span>Controls</div>
+      <div class="dp-body">
+        <div id="ctrls">
+          <button class="btn" id="shareBtn">📡 Capture Screen</button>
+          <button class="btn" id="camBtn">🎥 Enable Face Cam</button>
+
+          <div id="camSettings" class="subpanel" style="display:none">
+            <div class="frow">
+              <label>Shape</label>
+              <div class="rg">
+                <label><input type="radio" name="camShape" value="circle" checked> Circle</label>
+                <label><input type="radio" name="camShape" value="square"> Square</label>
+              </div>
+            </div>
+            <div class="frow" style="margin-top:6px">
+              <label>Size</label>
+              <input type="range" id="camSize" min="8" max="60" value="22">
+            </div>
+            <div class="ctrl-link">Drag the cam bubble on the preview to position it.</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="frow">
+            <label class="key-label">Resolution</label>
+            <select id="resSelect"></select>
+          </div>
+          <div class="frow">
+            <label class="key-label">Bitrate</label>
+            <select id="bitrateSelect">
+              <option value="saver">Data Saver (1.5 Mbps)</option>
+              <option value="balanced" selected>Balanced (3 Mbps)</option>
+              <option value="quality">Quality (6 Mbps)</option>
+            </select>
+          </div>
+
+          <div class="divider"></div>
+
+          <div>
+            <div class="key-label" style="margin-bottom:3px">Twitch Stream Key</div>
+            <div class="key-row">
+              <input type="password" id="streamKey" placeholder="live_xxxxxxxxxxxxxxxx" autocomplete="off">
+              <label class="eye-toggle" title="Show key"><input type="checkbox" id="capsToggle">👁</label>
+            </div>
+          </div>
+          <button class="btn btn-start" id="goLiveBtn" disabled>▶ Start Streaming</button>
+          <button class="btn btn-stop" id="stopBtn">■ Stop Streaming</button>
+          <div class="ctrl-link">
+            Get your key from the <a href="https://dashboard.twitch.tv/settings/stream" target="_blank" rel="noopener">Twitch dashboard</a> under Settings → Stream.
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="btn-row">
+            <button class="btn" id="recordBtn" title="Start local recording">⏺ Record</button>
+            <button class="btn" id="screenshotBtn" title="Save a screenshot">📷 Shot</button>
+          </div>
+          <button class="btn btn-panic" id="panicBtn" title="Mute mic + desktop, hide cam (F9)">⛔ Panic (F9)</button>
+
+          <div class="divider"></div>
+
+          <label class="chk-inline"><input type="checkbox" id="transitionToggle">Cross-fade between scenes</label>
+          <label class="chk-inline"><input type="checkbox" id="highContrastToggle">High-contrast UI</label>
+          <label class="chk-inline"><input type="checkbox" id="captionsToggle">Live captions (beta)</label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="statusbar">
+  <div class="sb-seg">
+    <span class="sb-dot" id="sbDot"></span>
+    <span id="sbText">Idle</span>
+  </div>
+  <div class="sb-seg" id="sbConnSeg">
+    <span class="sb-dot" id="sbConn"></span>
+  </div>
+  <div class="sb-seg" id="sbTimerSeg" style="display:none">
+    <span>Live:</span>
+    <span id="sb-timer">00:00:00</span>
+  </div>
+  <span class="sb-bitrate" id="sbBitrate" style="display:none"></span>
+</div>
+
+<div id="toasts" aria-live="polite"></div>
+
+<!-- OVERLAY / SOURCE MODAL -->
+<div id="modal-wrap" class="hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-hd">
+      <span id="modalTitle">Add Source</span>
+      <span class="modal-x" id="modalX">×</span>
+    </div>
+    <div class="modal-body">
+      <div class="frow">
+        <label>Type</label>
+        <div class="rg rg-wrap">
+          <label><input type="radio" name="ovType" value="text" checked> Text</label>
+          <label><input type="radio" name="ovType" value="image"> Image</label>
+          <label><input type="radio" name="ovType" value="clock"> Clock</label>
+          <label><input type="radio" name="ovType" value="countdown"> Countdown</label>
+          <label><input type="radio" name="ovType" value="ticker"> Ticker</label>
+        </div>
+      </div>
+
+      <div id="fldTextContent">
+        <div class="frow" style="margin-top:8px">
+          <label id="ovTextLabel">Text</label>
+          <input type="text" id="ovText" placeholder="Your text here…">
+        </div>
+      </div>
+
+      <div id="fldClock" style="display:none">
+        <label class="chk-inline" style="margin-top:8px"><input type="checkbox" id="ovShowSeconds" checked>Show seconds</label>
+      </div>
+
+      <div id="fldCountdown" style="display:none">
+        <div class="frow-inline" style="margin-top:8px">
+          <div class="frow"><label>Minutes from now</label><input type="number" id="ovCountdownMin" value="5" min="0"></div>
+          <div class="frow"><label>Text when done</label><input type="text" id="ovDoneText" value="LIVE NOW"></div>
+        </div>
+      </div>
+
+      <div id="fldTicker" style="display:none">
+        <div class="frow" style="margin-top:8px">
+          <label>Scroll speed (px/sec)</label>
+          <input type="number" id="ovTickerSpeed" value="60" min="5" max="400">
+        </div>
+      </div>
+
+      <div id="fldTextStyle">
+        <div class="frow-inline" style="margin-top:8px">
+          <div class="frow"><label>Font size</label><input type="number" id="ovSize" value="36" min="8" max="300"></div>
+          <div class="frow"><label>Color</label><input type="color" id="ovColor" value="#ffffff"></div>
+        </div>
+        <div class="frow" style="margin-top:8px">
+          <label>Font</label>
+          <select id="ovFont">
+            <option value="sans">Sans-serif</option>
+            <option value="serif">Serif</option>
+            <option value="mono">Monospace</option>
+            <option value="impact">Impact</option>
+            <option value="comic">Comic</option>
+          </select>
+        </div>
+        <div class="frow-inline" style="margin-top:8px;align-items:center">
+          <div class="frow-check"><input type="checkbox" id="ovBgOn"><label for="ovBgOn">Background</label></div>
+          <div class="frow"><input type="color" id="ovBgColor" value="#000000"></div>
+        </div>
+        <div class="frow-inline" style="margin-top:8px;align-items:center">
+          <div class="frow-check"><input type="checkbox" id="ovShadow"><label for="ovShadow">Drop shadow</label></div>
+          <div class="frow-check"><input type="checkbox" id="ovStroke"><label for="ovStroke">Outline</label></div>
+          <div class="frow"><input type="color" id="ovStrokeColor" value="#000000"></div>
+        </div>
+      </div>
+
+      <div id="imgFields" style="display:none">
+        <div class="frow">
+          <label>Image file (PNG, JPG, GIF, WebP…)</label>
+          <input type="file" id="ovFile" accept="image/*">
+        </div>
+      </div>
+
+      <div id="fldPosition" class="frow-inline" style="margin-top:8px">
+        <div class="frow"><label>X position (%)</label><input type="number" id="ovX" value="5" min="0" max="100"></div>
+        <div class="frow"><label>Y position (%)</label><input type="number" id="ovY" value="90" min="0" max="100"></div>
+      </div>
+      <div id="fldSize" class="frow-inline" style="margin-top:8px">
+        <div class="frow"><label>Width (%)</label><input type="number" id="ovW" value="25" min="1" max="100" step="0.1"></div>
+        <div class="frow"><label>Height (%)</label><input type="number" id="ovH" value="10" min="1" max="100" step="0.1"></div>
+      </div>
+      <div class="ctrl-link" id="fldSizeHint">Drag a source on the preview to move it; drag a corner or edge handle to resize or stretch it.</div>
+      <div class="frow" style="margin-top:8px">
+        <label>Opacity — <span id="opPct">100</span>%</label>
+        <input type="range" id="ovOpacity" min="0" max="100" value="100">
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="mbtn" id="modalCancel">Cancel</button>
+      <button class="mbtn mbtn-ok" id="modalSave">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- WALKTHROUGH -->
+<div id="walkthrough" class="hidden">
+  <div class="walk-card">
+    <div class="walk-dots" id="walkDots"></div>
+    <h2 id="walkTitle"></h2>
+    <p id="walkDesc"></p>
+    <div class="walk-ft">
+      <span class="mbtn" id="walkSkip">Skip</span>
+      <div style="flex:1"></div>
+      <button class="mbtn" id="walkPrev">Back</button>
+      <button class="mbtn mbtn-ok" id="walkNext">Next</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
